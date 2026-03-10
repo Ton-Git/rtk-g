@@ -68,7 +68,7 @@ fn hash_path(hook_path: &Path) -> PathBuf {
 ///
 /// Format is compatible with `sha256sum -c`:
 /// ```text
-/// <hex_hash>  rtk-rewrite.{sh,ps1}
+/// <hex_hash>  rtk-rewrite.sh (or rtk-rewrite.ps1 on Windows)
 /// ```
 ///
 /// The hash file is set to read-only (0o444) as a speed bump
@@ -190,7 +190,7 @@ fn read_stored_hash(path: &Path) -> Result<String> {
     Ok(hash.to_string())
 }
 
-/// Resolve the default hook path (~/.claude/hooks/rtk-rewrite.{sh,ps1})
+/// Resolve the default hook path (~/.claude/hooks/rtk-rewrite.sh or .ps1 on Windows)
 pub fn resolve_hook_path() -> Result<PathBuf> {
     dirs::home_dir()
         .map(|h| h.join(".claude").join("hooks").join(hook_filename()))

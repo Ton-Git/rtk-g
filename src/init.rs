@@ -1182,7 +1182,7 @@ mod tests {
 
     #[test]
     fn test_hook_command_for_settings_matches_platform() {
-        let hook_path = PathBuf::from(format!("/tmp/{}", expected_hook_filename()));
+        let hook_path = std::env::temp_dir().join(expected_hook_filename());
         let hook_command = hook_command_for_settings(&hook_path);
 
         #[cfg(windows)]
