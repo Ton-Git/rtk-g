@@ -55,6 +55,38 @@ Prefer this shape:
   - `install.ps1`
 - Make **small, localized Rust changes** only where the current code hard-codes Unix assumptions.
 - Avoid touching filtering logic or unrelated command modules unless they currently fail only because of Unix-only tool detection.
+- Keep `/home/runner/work/rtk-g/rtk-g/hooks/rtk-rewrite.sh` unchanged to avoid disruption for existing Unix users.
+
+### Alternative considered: Node + TypeScript (or plain JavaScript) hook
+
+This alternative was evaluated because a single cross-platform hook implementation could look attractive on paper. For this repository, it is **not** the minimal-disruption choice.
+
+#### Why Node/TypeScript is a worse fit here
+
+- The repository is currently a **Rust-only** project:
+  - `/home/runner/work/rtk-g/rtk-g/Cargo.toml` is the only top-level package manifest.
+  - There is no `package.json`, no Node runtime assumption, and no TypeScript build pipeline.
+- A TypeScript hook would require either:
+  - committing compiled JavaScript artifacts, or
+  - introducing a Node/TypeScript build step just to produce the hook.
+- Even a plain JavaScript hook would still add a **Node.js runtime dependency** for Windows users who currently only need the `rtk` binary.
+- That would make `rtk init -g` depend on a toolchain that is unrelated to the rest of the product and not guaranteed to exist on Windows machines using the released binary or `cargo install`.
+
+#### Why a PowerShell hook remains the lower-risk option
+
+- PowerShell is already available on supported Windows environments, so it does not add a new runtime dependency.
+- It preserves the current architecture:
+  - keep the existing shell hook for Unix
+  - keep all rewrite logic in `rtk rewrite`
+  - add only a thin Windows-native delegating hook
+- It limits the implementation to additive assets plus small `src/init.rs` changes, which aligns with the goal of a non-disruptive PR.
+
+#### Recommendation
+
+- **Do not** switch the plan to Node + TypeScript.
+- **Do** keep `/home/runner/work/rtk-g/rtk-g/hooks/rtk-rewrite.sh` as-is for Unix.
+- **Do** add a Windows-native thin hook (`.ps1`) unless Claude Code’s Windows hook contract explicitly requires a different wrapper.
+- If a future version of the project adopts Node tooling for other reasons, a JavaScript-based shared hook can be reconsidered then as a follow-up, not as the initial Windows-support path.
 
 ## Required change points
 
