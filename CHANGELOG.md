@@ -58,16 +58,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * **toml-dsl:** declarative TOML filter engine — add command filters without writing Rust ([#299](https://github.com/rtk-ai/rtk/issues/299))
   * 8 primitives: `strip_ansi`, `replace`, `match_output`, `strip/keep_lines_matching`, `truncate_lines_at`, `head/tail_lines`, `max_lines`, `on_empty`
-  * lookup chain: `.rtk/filters.toml` (project-local) → built-in filters
+  * lookup chain: `.rtk/filters.toml` (project-local) → `~/.config/rtk/filters.toml` (user-global) → built-in filters
   * `RTK_NO_TOML=1` bypass, `RTK_TOML_DEBUG=1` debug mode
+  * shadow warning when a TOML filter's match_command overlaps a Rust-handled command
+  * `rtk init` generates commented filter templates at both project and global level
   * `rtk verify` command with `--require-all` for inline test validation
-  * 14 new built-in filters: `tofu-plan/init/validate/fmt` ([#240](https://github.com/rtk-ai/rtk/issues/240)), `du` ([#284](https://github.com/rtk-ai/rtk/issues/284)), `fail2ban-client` ([#281](https://github.com/rtk-ai/rtk/issues/281)), `iptables` ([#282](https://github.com/rtk-ai/rtk/issues/282)), `mix-format/compile` ([#310](https://github.com/rtk-ai/rtk/issues/310)), `shopify-theme` ([#280](https://github.com/rtk-ai/rtk/issues/280)), `pio-run` ([#231](https://github.com/rtk-ai/rtk/issues/231)), `mvn-build` ([#338](https://github.com/rtk-ai/rtk/issues/338))
+  * 18 built-in filters: `tofu-plan/init/validate/fmt` ([#240](https://github.com/rtk-ai/rtk/issues/240)), `du` ([#284](https://github.com/rtk-ai/rtk/issues/284)), `fail2ban-client` ([#281](https://github.com/rtk-ai/rtk/issues/281)), `iptables` ([#282](https://github.com/rtk-ai/rtk/issues/282)), `mix-format/compile` ([#310](https://github.com/rtk-ai/rtk/issues/310)), `shopify-theme` ([#280](https://github.com/rtk-ai/rtk/issues/280)), `pio-run` ([#231](https://github.com/rtk-ai/rtk/issues/231)), `mvn-build` ([#338](https://github.com/rtk-ai/rtk/issues/338)), `pre-commit`, `helm`, `gcloud`, `ansible-playbook`
 * **hooks:** `exclude_commands` config — exclude specific commands from auto-rewrite ([#243](https://github.com/rtk-ai/rtk/issues/243))
 
 ### Bug Fixes
 
 * **curl:** skip JSON schema replacement when schema is larger than original payload ([#297](https://github.com/rtk-ai/rtk/issues/297))
 * **toml-dsl:** fix regex overmatch on `tofu-plan/init/validate/fmt` and `mix-format/compile` — add `(\s|$)` word boundary to prevent matching subcommands (e.g. `tofu planet`, `mix formats`) ([#349](https://github.com/rtk-ai/rtk/issues/349))
+* **toml-dsl:** remove 3 dead built-in filters (`docker-inspect`, `docker-compose-ps`, `pnpm-build`) — Clap routes these commands before `run_fallback`, so the TOML filters never fire ([#351](https://github.com/rtk-ai/rtk/issues/351))
+* **toml-dsl:** `uv-sync` — remove `Resolved` short-circuit; it fires before the package list is printed, hiding installed packages ([#386](https://github.com/rtk-ai/rtk/issues/386))
+* **toml-dsl:** `dotnet-build` — short-circuit only when both warning and error counts are zero; builds with warnings now pass through ([#386](https://github.com/rtk-ai/rtk/issues/386))
+* **toml-dsl:** `poetry-install` — support Poetry 2.x bullet syntax (`•`) and `No changes.` up-to-date message ([#386](https://github.com/rtk-ai/rtk/issues/386))
+* **toml-dsl:** `ping` — add Windows format support (`Pinging` header, `Reply from` per-packet lines) ([#386](https://github.com/rtk-ai/rtk/issues/386))
 
 ## [0.25.0](https://github.com/rtk-ai/rtk/compare/v0.24.0...v0.25.0) (2026-03-05)
 
