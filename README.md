@@ -66,7 +66,7 @@ brew install rtk
 ### Quick Install (Linux/macOS)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Ton-Git/rtk-g/develop/install.sh | sh
 ```
 
 > Installs to `~/.local/bin`. Add to PATH if needed:
@@ -74,15 +74,23 @@ curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/instal
 > echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc  # or ~/.zshrc
 > ```
 
+### Quick Install (Windows PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/Ton-Git/rtk-g/develop/install.ps1 | iex
+```
+
+> Installs to `$HOME\.local\bin` by default. Add that directory to your user PATH if needed.
+
 ### Cargo
 
 ```bash
-cargo install --git https://github.com/rtk-ai/rtk
+cargo install --git https://github.com/Ton-Git/rtk-g
 ```
 
 ### Pre-built Binaries
 
-Download from [releases](https://github.com/rtk-ai/rtk/releases):
+Download from [releases](https://github.com/Ton-Git/rtk-g/releases):
 - macOS: `rtk-x86_64-apple-darwin.tar.gz` / `rtk-aarch64-apple-darwin.tar.gz`
 - Linux: `rtk-x86_64-unknown-linux-musl.tar.gz` / `rtk-aarch64-unknown-linux-gnu.tar.gz`
 - Windows: `rtk-x86_64-pc-windows-msvc.zip`
@@ -101,7 +109,7 @@ rtk gain        # Should show token savings stats
 ```bash
 # 1. Install hook for Claude Code (recommended)
 rtk init --global
-# Follow instructions to register in ~/.claude/settings.json
+# Follow the printed instructions to register the hook in ~/.claude/settings.json
 
 # 2. Restart Claude Code, then test
 git status  # Automatically rewritten to rtk git status

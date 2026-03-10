@@ -50,8 +50,7 @@ pub fn parse_hook_version(content: &str) -> u8 {
 }
 
 fn hook_installed_path() -> Option<PathBuf> {
-    let home = dirs::home_dir()?;
-    let path = home.join(".claude").join("hooks").join("rtk-rewrite.sh");
+    let path = crate::integrity::resolve_hook_path().ok()?;
     if path.exists() {
         Some(path)
     } else {

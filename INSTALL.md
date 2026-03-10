@@ -5,7 +5,7 @@
 **There are TWO completely different projects named "rtk":**
 
 1. ✅ **Rust Token Killer** (this project) - LLM token optimizer
-   - Repos: `rtk-ai/rtk`
+   - Repo: `Ton-Git/rtk-g`
    - Has `rtk gain` command for token savings stats
 
 2. ❌ **Rust Type Kit** (reachingforthejack/rtk) - DIFFERENT PROJECT
@@ -27,6 +27,13 @@ rtk gain    # Should show token savings stats, NOT "command not found"
 which rtk
 ```
 
+```powershell
+# Windows PowerShell equivalent
+rtk --version
+rtk gain
+Get-Command rtk
+```
+
 If `rtk gain` works, you have the **correct** RTK installed. **DO NOT reinstall**. Skip to "Project Initialization".
 
 If `rtk gain` fails but `rtk --version` succeeds, you have the **wrong** RTK (Type Kit). Uninstall and reinstall the correct one (see below).
@@ -44,7 +51,7 @@ cargo uninstall rtk
 ### Quick Install (Linux/macOS)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Ton-Git/rtk-g/develop/install.sh | sh
 ```
 
 After installation, **verify you have the correct rtk**:
@@ -52,11 +59,20 @@ After installation, **verify you have the correct rtk**:
 rtk gain  # Must show token savings stats (not "command not found")
 ```
 
+### Quick Install (Windows PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/Ton-Git/rtk-g/develop/install.ps1 | iex
+
+# Verify you have the correct rtk
+rtk gain
+```
+
 ### Alternative: Manual Installation
 
 ```bash
-# From rtk-ai repository (NOT reachingforthejack!)
-cargo install --git https://github.com/rtk-ai/rtk
+# From Ton-Git/rtk-g repository (NOT reachingforthejack!)
+cargo install --git https://github.com/Ton-Git/rtk-g
 
 # OR (if published and correct on crates.io)
 cargo install rtk
@@ -93,7 +109,8 @@ rtk gain  # MUST show token savings, not "command not found"
 
 ```bash
 rtk init -g
-# → Installs hook to ~/.claude/hooks/rtk-rewrite.sh
+# → Installs hook to ~/.claude/hooks/rtk-rewrite.sh (macOS/Linux)
+#   or ~/.claude/hooks/rtk-rewrite.ps1 (Windows)
 # → Creates ~/.claude/RTK.md (10 lines, meta commands only)
 # → Adds @RTK.md reference to ~/.claude/CLAUDE.md
 # → Prompts: "Patch settings.json? [y/N]"
@@ -113,7 +130,7 @@ rtk init --show  # Check hook is installed and executable
 Claude Code's hook registry. RTK adds a PreToolUse hook that rewrites commands transparently. Without this, Claude won't invoke the hook automatically.
 
 ```
-  Claude Code          settings.json        rtk-rewrite.sh        RTK binary
+  Claude Code          settings.json      rtk-rewrite.sh/.ps1     RTK binary
        │                    │                     │                    │
        │  "git status"      │                     │                    │
        │ ──────────────────►│                     │                    │
@@ -136,6 +153,27 @@ RTK backs up existing settings.json before changes. Restore if needed:
 ```bash
 cp ~/.claude/settings.json.bak ~/.claude/settings.json
 ```
+
+```powershell
+Copy-Item $HOME\.claude\settings.json.bak $HOME\.claude\settings.json
+```
+
+### Windows Setup
+
+**Best for: Native PowerShell workflow on Windows**
+
+```powershell
+# Install binary
+irm https://raw.githubusercontent.com/Ton-Git/rtk-g/develop/install.ps1 | iex
+
+# Install hook + RTK.md + settings registration prompt
+rtk init -g
+
+# Verify setup
+rtk init --show
+```
+
+Windows installs the PowerShell hook at `~/.claude/hooks/rtk-rewrite.ps1` and registers it in `settings.json` using a `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ...` command wrapper.
 
 ### Alternative: Local Project Setup
 
@@ -179,7 +217,7 @@ rtk init --show
 ### First-Time User (Recommended)
 ```bash
 # 1. Install RTK
-cargo install --git https://github.com/rtk-ai/rtk
+cargo install --git https://github.com/Ton-Git/rtk-g
 rtk gain  # Verify (must show token stats)
 
 # 2. Setup with prompts
@@ -247,7 +285,7 @@ rtk vitest run
 rtk init -g --uninstall
 
 # What gets removed:
-#   - Hook: ~/.claude/hooks/rtk-rewrite.sh
+#   - Hook: ~/.claude/hooks/rtk-rewrite.sh or ~/.claude/hooks/rtk-rewrite.ps1
 #   - Context: ~/.claude/RTK.md
 #   - Reference: @RTK.md line from ~/.claude/CLAUDE.md
 #   - Registration: RTK hook entry from settings.json
@@ -372,8 +410,8 @@ cargo install --path . --force
 - **Website**: https://www.rtk-ai.app
 - **Contact**: contact@rtk-ai.app
 - **Troubleshooting**: See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues
-- **GitHub issues**: https://github.com/rtk-ai/rtk/issues
-- **Pull Requests**: https://github.com/rtk-ai/rtk/pulls
+- **GitHub issues**: https://github.com/Ton-Git/rtk-g/issues
+- **Pull Requests**: https://github.com/Ton-Git/rtk-g/pulls
 
 ⚠️ **If you installed the wrong rtk (Type Kit)**, see [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#problem-rtk-gain-command-not-found)
 

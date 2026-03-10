@@ -73,14 +73,14 @@ $ 3 commits      ←─  Terminal      ←─   Format      ←─   Compact Sta
 
 ### Hook Architecture (v0.9.5+)
 
-The recommended deployment mode uses a Claude Code PreToolUse hook for 100% transparent command rewriting.
+The recommended deployment mode uses a Claude Code PreToolUse hook for 100% transparent command rewriting on macOS, Linux, and Windows.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
 │                    Hook-Based Command Rewriting                        │
 └────────────────────────────────────────────────────────────────────────┘
 
-Claude Code             settings.json        rtk-rewrite.sh        RTK binary
+Claude Code             settings.json      rtk-rewrite.sh/.ps1     RTK binary
      │                       │                     │                    │
      │  Bash: "git status"   │                     │                    │
      │ ─────────────────────►│                     │                    │
@@ -102,7 +102,8 @@ Claude Code             settings.json        rtk-rewrite.sh        RTK binary
      │  Claude never sees the rewrite — it only sees optimized output.
 
 Files:
-  ~/.claude/hooks/rtk-rewrite.sh  ← thin delegator (calls `rtk rewrite`, ~50 lines)
+  ~/.claude/hooks/rtk-rewrite.sh   ← Unix thin delegator (calls `rtk rewrite`, ~50 lines)
+  ~/.claude/hooks/rtk-rewrite.ps1  ← Windows thin delegator (calls `rtk rewrite`, ~50 lines)
   ~/.claude/settings.json         ← hook registry (PreToolUse registration)
   ~/.claude/RTK.md                ← minimal context hint (10 lines)
 ```
@@ -1438,7 +1439,7 @@ When implementing a new command, consider:
 - **Performance**: ~5-15ms overhead per command (negligible for user experience)
 - **Safety**: No runtime errors from null pointers, data races, etc.
 - **Single Binary**: No runtime dependencies (distribute one executable)
-- **Cross-Platform**: Works on macOS, Linux, Windows without modification
+- **Cross-Platform**: Works on macOS/Linux directly and on Windows with native PowerShell hook/installer support
 
 ### Why SQLite for Tracking?
 
