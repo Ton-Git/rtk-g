@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 /// Filename for the stored hash (dotfile alongside hook)
 const HASH_FILENAME: &str = ".rtk-hook.sha256";
 
-fn hook_filename() -> &'static str {
+pub(crate) fn hook_filename() -> &'static str {
     #[cfg(windows)]
     {
         "rtk-rewrite.ps1"

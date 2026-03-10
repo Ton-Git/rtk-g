@@ -8,6 +8,7 @@
 use anyhow::{Context, Result};
 use regex::Regex;
 use std::env;
+use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -231,7 +232,7 @@ pub fn detect_package_manager() -> &'static str {
 fn find_command_in_dirs(cmd: &str, dirs: &[PathBuf], pathext: Option<&str>) -> Option<PathBuf> {
     for dir in dirs {
         let direct = dir.join(cmd);
-        if direct.is_file() {
+        if is_runnable_command(&direct) {
             return Some(direct);
         }
 
@@ -239,7 +240,7 @@ fn find_command_in_dirs(cmd: &str, dirs: &[PathBuf], pathext: Option<&str>) -> O
             for ext in exts.split(';').map(str::trim).filter(|ext| !ext.is_empty()) {
                 let ext = ext.trim_start_matches('.');
                 let candidate = dir.join(format!("{cmd}.{ext}"));
-                if candidate.is_file() {
+                if is_runnable_command(&candidate) {
                     return Some(candidate);
                 }
             }
@@ -247,6 +248,21 @@ fn find_command_in_dirs(cmd: &str, dirs: &[PathBuf], pathext: Option<&str>) -> O
     }
 
     None
+}
+
+#[cfg(unix)]
+fn is_runnable_command(path: &std::path::Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+
+    path.is_file()
+        && fs::metadata(path)
+            .map(|metadata| metadata.permissions().mode() & 0o111 != 0)
+            .unwrap_or(false)
+}
+
+#[cfg(not(unix))]
+fn is_runnable_command(path: &std::path::Path) -> bool {
+    path.is_file()
 }
 
 pub fn find_command_in_path(cmd: &str) -> Option<PathBuf> {
@@ -337,8 +353,27 @@ mod tests {
         let binary = temp.path().join("demo-tool");
         std::fs::write(&binary, "echo demo").unwrap();
 
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&binary).unwrap().permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&binary, perms).unwrap();
+        }
+
         let found = find_command_in_dirs("demo-tool", &[temp.path().to_path_buf()], None);
         assert_eq!(found, Some(binary));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_find_command_in_dirs_ignores_non_executable_file() {
+        let temp = TempDir::new().unwrap();
+        let binary = temp.path().join("demo-tool");
+        std::fs::write(&binary, "echo demo").unwrap();
+
+        let found = find_command_in_dirs("demo-tool", &[temp.path().to_path_buf()], None);
+        assert_eq!(found, None);
     }
 
     #[test]
@@ -346,6 +381,14 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let binary = temp.path().join("demo-tool.cmd");
         std::fs::write(&binary, "@echo off").unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&binary).unwrap().permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&binary, perms).unwrap();
+        }
 
         let found = find_command_in_dirs(
             "demo-tool",

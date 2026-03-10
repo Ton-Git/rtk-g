@@ -32,30 +32,21 @@ pub enum PatchResult {
     Skipped,        // --no-patch flag used
 }
 
-fn hook_filename() -> &'static str {
+fn hook_command_for_settings(hook_path: &Path) -> Result<String> {
     #[cfg(windows)]
     {
-        "rtk-rewrite.ps1"
-    }
-
-    #[cfg(not(windows))]
-    {
-        "rtk-rewrite.sh"
-    }
-}
-
-fn hook_command_for_settings(hook_path: &Path) -> String {
-    #[cfg(windows)]
-    {
-        format!(
+        Ok(format!(
             "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"{}\"",
             hook_path.display()
-        )
+        ))
     }
 
     #[cfg(not(windows))]
     {
-        hook_path.display().to_string()
+        hook_path
+            .to_str()
+            .map(ToOwned::to_owned)
+            .context("Hook path contains invalid UTF-8")
     }
 }
 
@@ -221,7 +212,7 @@ fn prepare_hook_paths() -> Result<(PathBuf, PathBuf)> {
     let hook_dir = claude_dir.join("hooks");
     fs::create_dir_all(&hook_dir)
         .with_context(|| format!("Failed to create hook directory: {}", hook_dir.display()))?;
-    let hook_path = hook_dir.join(hook_filename());
+    let hook_path = hook_dir.join(crate::integrity::hook_filename());
     Ok((hook_dir, hook_path))
 }
 
@@ -347,7 +338,8 @@ fn prompt_user_consent(settings_path: &Path) -> Result<bool> {
 
 /// Print manual instructions for settings.json patching
 fn print_manual_instructions(hook_path: &Path) {
-    let hook_command = hook_command_for_settings(hook_path);
+    let hook_command =
+        hook_command_for_settings(hook_path).expect("manual instructions require UTF-8 path");
     let hook_command_json =
         serde_json::to_string(&hook_command).expect("serializing hook command must succeed");
     println!("\n  MANUAL STEP: Add this to ~/.claude/settings.json:");
@@ -447,7 +439,9 @@ pub fn uninstall(global: bool, verbose: u8) -> Result<()> {
     let mut removed = Vec::new();
 
     // 1. Remove hook file
-    let hook_path = claude_dir.join("hooks").join(hook_filename());
+    let hook_path = claude_dir
+        .join("hooks")
+        .join(crate::integrity::hook_filename());
     if hook_path.exists() {
         fs::remove_file(&hook_path)
             .with_context(|| format!("Failed to remove hook: {}", hook_path.display()))?;
@@ -514,7 +508,7 @@ pub fn uninstall(global: bool, verbose: u8) -> Result<()> {
 fn patch_settings_json(hook_path: &Path, mode: PatchMode, verbose: u8) -> Result<PatchResult> {
     let claude_dir = resolve_claude_dir()?;
     let settings_path = claude_dir.join("settings.json");
-    let hook_command = hook_command_for_settings(hook_path);
+    let hook_command = hook_command_for_settings(hook_path)?;
 
     // Read or create settings.json
     let mut root = if settings_path.exists() {
@@ -1016,7 +1010,9 @@ fn resolve_claude_dir() -> Result<PathBuf> {
 /// Show current rtk configuration
 pub fn show_config() -> Result<()> {
     let claude_dir = resolve_claude_dir()?;
-    let hook_path = claude_dir.join("hooks").join(hook_filename());
+    let hook_path = claude_dir
+        .join("hooks")
+        .join(crate::integrity::hook_filename());
     let rtk_md_path = claude_dir.join("RTK.md");
     let global_claude_md = claude_dir.join("CLAUDE.md");
     let local_claude_md = PathBuf::from("CLAUDE.md");
@@ -1131,7 +1127,7 @@ pub fn show_config() -> Result<()> {
         let content = fs::read_to_string(&settings_path)?;
         if !content.trim().is_empty() {
             if let Ok(root) = serde_json::from_str::<serde_json::Value>(&content) {
-                let hook_command = hook_command_for_settings(&hook_path);
+                let hook_command = hook_command_for_settings(&hook_path)?;
                 if hook_already_present(&root, &hook_command) {
                     println!("✅ settings.json: RTK hook configured");
                 } else {
@@ -1177,19 +1173,29 @@ mod tests {
 
     #[test]
     fn test_hook_filename_matches_platform() {
-        assert_eq!(hook_filename(), expected_hook_filename());
+        assert_eq!(crate::integrity::hook_filename(), expected_hook_filename());
     }
 
     #[test]
     fn test_hook_command_for_settings_matches_platform() {
         let hook_path = std::env::temp_dir().join(expected_hook_filename());
-        let hook_command = hook_command_for_settings(&hook_path);
+        let hook_command = hook_command_for_settings(&hook_path).unwrap();
 
         #[cfg(windows)]
         assert!(hook_command.contains("powershell.exe"));
 
         #[cfg(not(windows))]
         assert_eq!(hook_command, hook_path.display().to_string());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_hook_command_for_settings_rejects_non_utf8_path() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let hook_path = PathBuf::from(OsString::from_vec(vec![0x66, 0x6f, 0x80]));
+        assert!(hook_command_for_settings(&hook_path).is_err());
     }
 
     #[test]
@@ -1242,8 +1248,9 @@ mod tests {
         #[cfg(windows)]
         {
             assert!(REWRITE_HOOK.contains("Get-Command rtk"));
+            assert!(REWRITE_HOOK.contains("[Console]::Error.WriteLine"));
             let rtk_guard_pos = REWRITE_HOOK.find("Get-Command rtk").unwrap();
-            let rtk_delegate_pos = REWRITE_HOOK.find("rtk rewrite").unwrap();
+            let rtk_delegate_pos = REWRITE_HOOK.find("& rtk rewrite").unwrap();
             assert!(rtk_guard_pos < rtk_delegate_pos);
         }
 
