@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add **full Windows support** for RTK with the **smallest possible change set**, favoring **new additive assets** (PowerShell hook/installer/docs) over broad refactors. The current codebase is already close to Windows-ready: release packaging exists, several command runners already use `cmd` on Windows, and path storage relies on cross-platform crates. The remaining gaps are concentrated in the **Claude Code hook/bootstrap flow**, **Unix-only command discovery**, and **Windows-specific installation documentation**.
+Add **full Windows support** for rtk with the **smallest possible change set**, favoring **new additive assets** (PowerShell hook/installer/docs) over broad refactors. The current codebase is already close to Windows-ready: release packaging exists, several command runners already use `cmd` on Windows, and path storage relies on cross-platform crates. The remaining gaps are concentrated in the **Claude Code hook/bootstrap flow**, **Unix-only command discovery**, and **Windows-specific installation documentation**.
 
 ## Baseline findings
 
@@ -151,7 +151,7 @@ This is the main Rust orchestration surface and the biggest source of hard-coded
 
 ### 3) Replace Unix-only runtime command lookup
 
-The current implementation assumes `which` exists. That is not true on Windows. This affects actual RTK command behavior, not just helper scripts.
+The current implementation assumes `which` exists. That is not true on Windows. This affects actual rtk command behavior, not just helper scripts.
 
 #### Best minimal approach
 
@@ -160,7 +160,9 @@ Use one shared cross-platform lookup mechanism in Rust, then update all `which` 
 Two acceptable options:
 
 1. **Preferred:** add the `which` crate and centralize lookup in a helper.
-2. **Alternative:** implement a small internal helper using `PATH`/PATHEXT`.
+2. **Alternative:** implement a small internal helper with platform-specific logic:
+   - Windows: search `PATH` using `PATHEXT`
+   - Unix: search `PATH` and rely on executable file semantics
 
 The first option is simpler and less error-prone, but it is a new dependency and should be kept localized.
 
@@ -179,7 +181,7 @@ The first option is simpler and less error-prone, but it is a new dependency and
 
 #### Notes
 
-- `tree` may still not exist on Windows by default; that is fine if RTK reports a good installation hint.
+- `tree` may still not exist on Windows by default; that is fine if rtk reports a good installation hint.
 - The goal here is to remove the **false negative caused by `which`**, not to guarantee every external tool is bundled with Windows.
 
 ### 4) Windows installer
@@ -209,8 +211,8 @@ Windows users currently have to manually find the release zip or rely on Cargo. 
 
 Plan on a Windows-appropriate user bin location such as one of:
 
-- `%USERPROFILE%\\.local\\bin`
-- `%USERPROFILE%\\bin`
+- `%USERPROFILE%\.local\bin`
+- `%USERPROFILE%\bin`
 
 The exact target should match whatever the docs recommend and should be consistent with PATH guidance.
 
@@ -236,7 +238,9 @@ The exact target should match whatever the docs recommend and should be consiste
    - Include PowerShell equivalents for restore/edit commands where examples are currently shell-only.
 
 3. **ARCHITECTURE.md**
-   - The current “works on macOS, Linux, Windows without modification” statement should be reconciled with the current reality and then updated once Windows hook support is actually complete.
+   - The current “works on macOS, Linux, Windows without modification” statement should be updated.
+   - Windows already has release binaries and some runtime support, but it still lacks first-class hook-based `rtk init -g` support and a Windows-native installer.
+   - Once those gaps are closed, the architecture doc can restore the stronger cross-platform claim.
 
 #### Additional docs to consider
 
@@ -269,7 +273,7 @@ The user asked for analysis first, but implementation will need targeted tests t
 
 ## Optional but lower-priority follow-up work
 
-These are useful, but they are **not required** to declare end-user Windows support for RTK itself.
+These are useful, but they are **not required** to declare end-user Windows support for rtk itself.
 
 ### Contributor/developer script parity
 
@@ -325,8 +329,11 @@ Nice-to-have only; not required for the initial issue.
 
 The only external behavior that should be confirmed before coding is **how Claude Code expects command hooks to be registered on Windows**:
 
-- whether the `matcher` remains `"Bash"`
-- whether the hook command can be a direct `.ps1` path
-- or whether it must be wrapped via `powershell.exe -File ...`
+- The `matcher` field in `settings.json` determines which tool/shell context triggers the hook, so it must match whatever Claude Code uses on Windows.
+- Confirm whether the `matcher` remains `"Bash"`.
+- Confirm whether the hook command can be a direct `.ps1` path.
+- Confirm whether it must instead be wrapped via `powershell.exe -File ...`.
+
+**Action item before implementation:** test Claude Code hook registration on Windows and capture the exact accepted matcher/command format, then implement `src/init.rs` and the Windows hook around that confirmed contract.
 
 Everything else can be implemented from the current codebase with small, localized changes.
