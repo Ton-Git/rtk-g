@@ -5,7 +5,7 @@
 **There are TWO completely different projects named "rtk":**
 
 1. ✅ **Rust Token Killer** (this project) - LLM token optimizer
-   - Repo: `Ton-Git/rtk-g`
+   - Repo: `rtk-ai/rtk-g`
    - Has `rtk gain` command for token savings stats
 
 2. ❌ **Rust Type Kit** (reachingforthejack/rtk) - DIFFERENT PROJECT
@@ -51,7 +51,7 @@ cargo uninstall rtk
 ### Quick Install (Linux/macOS)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Ton-Git/rtk-g/develop/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk-g/develop/install.sh | sh
 ```
 
 After installation, **verify you have the correct rtk**:
@@ -62,7 +62,7 @@ rtk gain  # Must show token savings stats (not "command not found")
 ### Quick Install (Windows PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/Ton-Git/rtk-g/develop/install.ps1 | iex
+irm https://raw.githubusercontent.com/rtk-ai/rtk-g/develop/install.ps1 | iex
 
 # Verify you have the correct rtk
 rtk gain
@@ -71,8 +71,8 @@ rtk gain
 ### Alternative: Manual Installation
 
 ```bash
-# From Ton-Git/rtk-g repository (NOT reachingforthejack!)
-cargo install --git https://github.com/Ton-Git/rtk-g
+# From rtk-ai/rtk-g repository (NOT reachingforthejack!)
+cargo install --git https://github.com/rtk-ai/rtk-g
 
 # OR (if published and correct on crates.io)
 cargo install rtk
@@ -164,7 +164,7 @@ Copy-Item $HOME\.claude\settings.json.bak $HOME\.claude\settings.json
 
 ```powershell
 # Install binary
-irm https://raw.githubusercontent.com/Ton-Git/rtk-g/develop/install.ps1 | iex
+irm https://raw.githubusercontent.com/rtk-ai/rtk-g/develop/install.ps1 | iex
 
 # Install hook + RTK.md + settings registration prompt
 rtk init -g
@@ -217,7 +217,7 @@ rtk init --show
 ### First-Time User (Recommended)
 ```bash
 # 1. Install RTK
-cargo install --git https://github.com/Ton-Git/rtk-g
+cargo install --git https://github.com/rtk-ai/rtk-g
 rtk gain  # Verify (must show token stats)
 
 # 2. Setup with prompts
@@ -410,8 +410,8 @@ cargo install --path . --force
 - **Website**: https://www.rtk-ai.app
 - **Contact**: contact@rtk-ai.app
 - **Troubleshooting**: See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues
-- **GitHub issues**: https://github.com/Ton-Git/rtk-g/issues
-- **Pull Requests**: https://github.com/Ton-Git/rtk-g/pulls
+- **GitHub issues**: https://github.com/rtk-ai/rtk-g/issues
+- **Pull Requests**: https://github.com/rtk-ai/rtk-g/pulls
 
 ⚠️ **If you installed the wrong rtk (Type Kit)**, see [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md#problem-rtk-gain-command-not-found)
 

@@ -25,7 +25,7 @@ try {
         $minor = [int]$Matches[2]
 
         if ($major -eq 0 -and $minor -lt 23) {
-            [Console]::Error.WriteLine("[rtk] WARNING: rtk $($Matches[0]) is too old (need >= 0.23.0). Upgrade: cargo install --git https://github.com/Ton-Git/rtk-g")
+            [Console]::Error.WriteLine("[rtk] WARNING: rtk $($Matches[0]) is too old (need >= 0.23.0). Upgrade: cargo install --git https://github.com/rtk-ai/rtk-g")
             exit 0
         }
     }

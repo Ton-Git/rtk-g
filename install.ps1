@@ -4,7 +4,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$Repo = "Ton-Git/rtk-g"
+$Repo = "rtk-ai/rtk-g"
 $BinaryName = "rtk.exe"
 
 function Write-Info([string]$Message) {

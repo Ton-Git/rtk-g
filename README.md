@@ -66,7 +66,7 @@ brew install rtk
 ### Quick Install (Linux/macOS)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Ton-Git/rtk-g/develop/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk-g/develop/install.sh | sh
 ```
 
 > Installs to `~/.local/bin`. Add to PATH if needed:
@@ -77,7 +77,7 @@ curl -fsSL https://raw.githubusercontent.com/Ton-Git/rtk-g/develop/install.sh | 
 ### Quick Install (Windows PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/Ton-Git/rtk-g/develop/install.ps1 | iex
+irm https://raw.githubusercontent.com/rtk-ai/rtk-g/develop/install.ps1 | iex
 ```
 
 > Installs to `$HOME\.local\bin` by default. Add that directory to your user PATH if needed.
@@ -85,12 +85,12 @@ irm https://raw.githubusercontent.com/Ton-Git/rtk-g/develop/install.ps1 | iex
 ### Cargo
 
 ```bash
-cargo install --git https://github.com/Ton-Git/rtk-g
+cargo install --git https://github.com/rtk-ai/rtk-g
 ```
 
 ### Pre-built Binaries
 
-Download from [releases](https://github.com/Ton-Git/rtk-g/releases):
+Download from [releases](https://github.com/rtk-ai/rtk-g/releases):
 - macOS: `rtk-x86_64-apple-darwin.tar.gz` / `rtk-aarch64-apple-darwin.tar.gz`
 - Linux: `rtk-x86_64-unknown-linux-musl.tar.gz` / `rtk-aarch64-unknown-linux-gnu.tar.gz`
 - Windows: `rtk-x86_64-pc-windows-msvc.zip`
