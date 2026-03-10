@@ -1,371 +1,46 @@
-# Windows Support Analysis Plan
-
-## Goal
-
-Add **full Windows support** for rtk with the **smallest possible change set**, favoring **new additive assets** (PowerShell hook/installer/docs) over broad refactors. The current codebase is already close to Windows-ready: release packaging exists, several command runners already use `cmd` on Windows, and path storage relies on cross-platform crates. The remaining gaps are concentrated in the **Claude Code hook/bootstrap flow**, **Unix-only command discovery**, and **Windows-specific installation documentation**.
-
-## Baseline findings
-
-### Already working or largely cross-platform
-
-- **Windows release artifacts already exist** in `/home/runner/work/rtk-g/rtk-g/.github/workflows/release.yml`.
-- **Command execution already branches for Windows** in:
-  - `/home/runner/work/rtk-g/rtk-g/src/runner.rs`
-  - `/home/runner/work/rtk-g/rtk-g/src/summary.rs`
-- **Data/config paths already use cross-platform helpers** (`dirs`/`PathBuf`) in modules such as:
-  - `/home/runner/work/rtk-g/rtk-g/src/init.rs`
-  - `/home/runner/work/rtk-g/rtk-g/src/config.rs`
-  - `/home/runner/work/rtk-g/rtk-g/src/tracking.rs`
-
-### Current Windows blockers
-
-1. **`rtk init` intentionally downgrades on non-Unix**
-   - `/home/runner/work/rtk-g/rtk-g/src/init.rs:658-664`
-   - Today Windows cannot use hook-first mode; it falls back to `--claude-md`.
-
-2. **The only bundled Claude hook is a shell script**
-   - `/home/runner/work/rtk-g/rtk-g/hooks/rtk-rewrite.sh`
-   - Embedded from `/home/runner/work/rtk-g/rtk-g/src/init.rs:10`
-   - It depends on Unix shell semantics and `jq`.
-
-3. **Hook path handling is hard-coded to `rtk-rewrite.sh`**
-   - `/home/runner/work/rtk-g/rtk-g/src/init.rs:185-191`
-   - Multiple install/show/uninstall/settings.json code paths look for `.sh` specifically.
-
-4. **Several runtime code paths use the Unix `which` command**
-   - These will fail on stock Windows shells unless replaced with a cross-platform lookup strategy.
-
-5. **The top-level installer is Linux/macOS-only**
-   - `/home/runner/work/rtk-g/rtk-g/install.sh`
-   - Uses `uname`, `tar`, POSIX shell flow, and no Windows branch.
-
-6. **Docs still describe Windows as binary download / CLAUDE.md fallback rather than first-class hook support**
-   - `/home/runner/work/rtk-g/rtk-g/README.md`
-   - `/home/runner/work/rtk-g/rtk-g/INSTALL.md`
-   - `/home/runner/work/rtk-g/rtk-g/ARCHITECTURE.md`
-
-## Proposed implementation strategy
-
-### Design principle
-
-Prefer this shape:
-
-- **Add** Windows-specific assets:
-  - `hooks/rtk-rewrite.ps1`
-  - `install.ps1`
-- Make **small, localized Rust changes** only where the current code hard-codes Unix assumptions.
-- Avoid touching filtering logic or unrelated command modules unless they currently fail only because of Unix-only tool detection.
-- Keep `/home/runner/work/rtk-g/rtk-g/hooks/rtk-rewrite.sh` unchanged to avoid disruption for existing Unix users.
-
-### Alternative considered: Node + TypeScript (or plain JavaScript) hook
-
-This alternative was evaluated because a single cross-platform hook implementation could look attractive on paper. For this repository, it is **not** the minimal-disruption choice.
-
-#### Why Node/TypeScript is a worse fit here
-
-- The repository is currently a **Rust-only** project:
-  - `/home/runner/work/rtk-g/rtk-g/Cargo.toml` is the only top-level package manifest.
-  - There is no `package.json`, no Node runtime assumption, and no TypeScript build pipeline.
-- A TypeScript hook would require either:
-  - committing compiled JavaScript artifacts, or
-  - introducing a Node/TypeScript build step just to produce the hook.
-- Even a plain JavaScript hook would still add a **Node.js runtime dependency** for Windows users who currently only need the `rtk` binary.
-- That would make `rtk init -g` depend on a toolchain that is unrelated to the rest of the product and not guaranteed to exist on Windows machines using the released binary or `cargo install`.
-
-#### Why a PowerShell hook remains the lower-risk option
-
-- PowerShell is already available on supported Windows environments, so it does not add a new runtime dependency.
-- It preserves the current architecture:
-  - keep the existing shell hook for Unix
-  - keep all rewrite logic in `rtk rewrite`
-  - add only a thin Windows-native delegating hook
-- It limits the implementation to additive assets plus small `src/init.rs` changes, which aligns with the goal of a non-disruptive PR.
-
-#### Recommendation
-
-- **Do not** switch the plan to Node + TypeScript.
-- **Do** keep `/home/runner/work/rtk-g/rtk-g/hooks/rtk-rewrite.sh` as-is for Unix.
-- **Do** add a Windows-native thin hook (`.ps1`) unless Claude Code’s Windows hook contract explicitly requires a different wrapper.
-- If a future version of the project adopts Node tooling for other reasons, a JavaScript-based shared hook can be reconsidered then as a follow-up, not as the initial Windows-support path.
-
-## Required change points
-
-### 1) Claude Code hook asset for Windows
-
-#### New file to add
-
-- `/home/runner/work/rtk-g/rtk-g/hooks/rtk-rewrite.ps1`
-
-#### Why it is needed
-
-Windows currently has no hook asset that can be installed by `rtk init -g`. The existing hook is:
-
-- shell-specific (`#!/usr/bin/env bash`)
-- dependent on `jq`
-- named and referenced as `.sh` everywhere
-
-#### Expected behavior
-
-The PowerShell hook should mirror the current shell hook:
-
-- read the JSON payload from stdin
-- extract `.tool_input.command`
-- no-op if `rtk` is unavailable
-- version-gate `rtk rewrite`
-- run `rtk rewrite <cmd>`
-- emit the updated Claude hook response JSON when a rewrite occurs
-
-#### Recommended implementation notes
-
-- Keep the hook **thin**, as with the existing shell version.
-- Avoid extra dependencies if possible; PowerShell’s native JSON conversion should replace `jq`.
-- Preserve the existing “delegate to `rtk rewrite`” architecture.
-
-### 2) `src/init.rs` must become hook-platform-aware
-
-This is the main Rust orchestration surface and the biggest source of hard-coded Unix assumptions.
-
-#### File to change
-
-- `/home/runner/work/rtk-g/rtk-g/src/init.rs`
-
-#### Required sub-changes
-
-1. **Embed the right hook asset per platform**
-   - Current: `include_str!("../hooks/rtk-rewrite.sh")`
-   - Needed: a Windows-aware selection between `.sh` and `.ps1`
-
-2. **Choose the correct hook filename**
-   - Current hard-coded filename:
-     - `rtk-rewrite.sh` in `prepare_hook_paths()`
-   - Needed:
-     - `.sh` on Unix
-     - `.ps1` on Windows
-
-3. **Install hook on Windows instead of forcing `--claude-md`**
-   - Current fallback:
-     - `/home/runner/work/rtk-g/rtk-g/src/init.rs:658-664`
-   - Needed:
-     - Windows should use hook-first mode if the PowerShell hook is available.
-
-4. **Avoid Unix-only permission logic on Windows**
-   - `ensure_hook_installed()` is currently `#[cfg(unix)]` and sets `0o755`
-   - Needed:
-     - Windows path that writes the hook without Unix permission handling
-     - integrity hash behavior should remain aligned if integrity checks still apply there
-
-5. **Patch `settings.json` using the Windows hook command**
-   - `patch_settings_json()`, `insert_hook_entry()`, and manual instructions must point to the correct hook path/command.
-   - If Claude Code on Windows requires a specific command wrapper (for example `powershell -File ...`), that needs to be encoded here.
-   - This is the one area that should be verified against Claude Code’s Windows hook expectations before implementation.
-
-6. **Hook detection/removal must stop matching only `.sh`**
-   - Functions/paths impacted:
-     - hook detection in settings.json
-     - uninstall flow
-     - show-config flow
-     - tests that assert `rtk-rewrite.sh`
-
-#### Specific `src/init.rs` areas that will need updating
-
-- embedded hook constant: `:10`
-- path creation: `:185-191`
-- settings cleanup matching `.sh`: `:357`, `:634-654`
-- uninstall hook path: `:423`
-- non-Unix default mode fallback: `:658-664`
-- show-config hook path: `:1012`
-- tests that assert `.sh` paths/content:
-  - `:1235+`
-  - `:1342+`
-  - `:1360+`
-  - `:1400+`
-  - `:1536+`
-
-### 3) Replace Unix-only runtime command lookup
-
-The current implementation assumes `which` exists. That is not true on Windows. This affects actual rtk command behavior, not just helper scripts.
-
-#### Best minimal approach
-
-Use one shared cross-platform lookup mechanism in Rust, then update all `which` callers to use it.
-
-Two acceptable options:
-
-1. **Preferred:** add the `which` crate and centralize lookup in a helper.
-2. **Alternative:** implement a small internal helper with platform-specific logic:
-   - Windows: search `PATH` using `PATHEXT`
-   - Unix: search `PATH` and rely on executable file semantics
-
-The first option is simpler and less error-prone, but it is a new dependency and should be kept localized.
-
-#### Files with user/runtime impact
-
-- `/home/runner/work/rtk-g/rtk-g/src/utils.rs`
-  - `package_manager_exec()` currently probes with `Command::new("which")`
-- `/home/runner/work/rtk-g/rtk-g/src/tsc_cmd.rs`
-- `/home/runner/work/rtk-g/rtk-g/src/prisma_cmd.rs`
-- `/home/runner/work/rtk-g/rtk-g/src/next_cmd.rs`
-- `/home/runner/work/rtk-g/rtk-g/src/pytest_cmd.rs`
-- `/home/runner/work/rtk-g/rtk-g/src/mypy_cmd.rs`
-- `/home/runner/work/rtk-g/rtk-g/src/pip_cmd.rs`
-- `/home/runner/work/rtk-g/rtk-g/src/ccusage.rs`
-- `/home/runner/work/rtk-g/rtk-g/src/tree.rs`
-
-#### Notes
-
-- `tree` may still not exist on Windows by default; that is fine if rtk reports a good installation hint.
-- The goal here is to remove the **false negative caused by `which`**, not to guarantee every external tool is bundled with Windows.
-
-### 4) Windows installer
-
-#### New file to add
-
-- `/home/runner/work/rtk-g/rtk-g/install.ps1`
-
-#### Why it is needed
-
-The current installer is explicitly Linux/macOS-only:
-
-- `/home/runner/work/rtk-g/rtk-g/install.sh`
-
-Windows users currently have to manually find the release zip or rely on Cargo. Adding a PowerShell installer is the cleanest additive way to make Windows feel first-class.
-
-#### Expected behavior
-
-- detect architecture
-- resolve latest release
-- download `rtk-x86_64-pc-windows-msvc.zip`
-- extract `rtk.exe`
-- install into a user-local bin directory
-- print PATH instructions if needed
-
-#### Recommended path target
-
-Plan on a Windows-appropriate user bin location such as one of:
-
-- `%USERPROFILE%\.local\bin`
-- `%USERPROFILE%\bin`
-
-The exact target should match whatever the docs recommend and should be consistent with PATH guidance.
-
-### 5) Documentation updates for first-class Windows support
-
-#### Files to update
-
-- `/home/runner/work/rtk-g/rtk-g/README.md`
-- `/home/runner/work/rtk-g/rtk-g/INSTALL.md`
-- `/home/runner/work/rtk-g/rtk-g/ARCHITECTURE.md`
-
-#### Required content changes
-
-1. **README**
-   - Add a Windows install path alongside Linux/macOS quick install.
-   - Document `rtk init -g` as supported on Windows once hook support lands.
-   - Add PowerShell examples for install/verification where appropriate.
-
-2. **INSTALL.md**
-   - Add a dedicated Windows installation/setup section.
-   - Update hook paths/examples from “Unix only” to platform-aware wording.
-   - Replace Windows guidance that currently implies `--claude-md` is the only full option.
-   - Include PowerShell equivalents for restore/edit commands where examples are currently shell-only.
-
-3. **ARCHITECTURE.md**
-   - The current “works on macOS, Linux, Windows without modification” statement should be updated.
-   - Windows already has release binaries and some runtime support, but it still lacks first-class hook-based `rtk init -g` support and a Windows-native installer.
-   - Once those gaps are closed, the architecture doc can restore the stronger cross-platform claim.
-
-#### Additional docs to consider
-
-- `/home/runner/work/rtk-g/rtk-g/CLAUDE.md`
-  - only if contributor instructions explicitly describe Windows as unsupported in `init`
-- localized READMEs
-  - optional follow-up, not required for the first Windows-support pass
-
-### 6) Tests that should be added or updated
-
-The user asked for analysis first, but implementation will need targeted tests to keep the changes safe.
-
-#### Primary test surface
-
-- `/home/runner/work/rtk-g/rtk-g/src/init.rs` existing tests
-
-#### Required test updates
-
-- replace `.sh`-specific assumptions with platform-aware helpers or separate Unix/Windows cases
-- add tests for hook path generation:
-  - Unix => `rtk-rewrite.sh`
-  - Windows => `rtk-rewrite.ps1`
-- add tests for settings.json detection/removal that work for both hook extensions
-- add tests for show/uninstall logic if helper functions are extracted
-
-#### Additional targeted tests
-
-- command lookup helper tests, especially if a new shared helper is introduced
-- potentially an install-script smoke test if the repo already has a pattern for script validation
-
-## Optional but lower-priority follow-up work
-
-These are useful, but they are **not required** to declare end-user Windows support for rtk itself.
-
-### Contributor/developer script parity
-
-Many scripts under `/home/runner/work/rtk-g/rtk-g/scripts` are still Bash-oriented. Notable examples:
-
-- `check-installation.sh` uses `which`
-- `test-all.sh`, `benchmark.sh`, `install-local.sh`, `rtk-economics.sh` are shell-first
-
-Recommended status:
-
-- **Do not block initial Windows support on these.**
-- If desired later, add Windows-specific companions such as:
-  - `check-installation.ps1`
-  - `install-local.ps1`
-
-### Package-manager distribution on Windows
-
-Potential future additions:
-
-- WinGet manifest
-- Chocolatey package
-
-Nice-to-have only; not required for the initial issue.
-
-## Suggested implementation order
+# Windows Support Implementation Plan Index
+
+This plan has been split into numbered phase documents so implementation can proceed in small, reviewable steps without changing product code yet.
+
+## Implementation phases
+
+1. [Phase 1 - Windows Claude hook asset](windows-support/01-hook-asset.md) - `/home/runner/work/rtk-g/rtk-g/plans/windows-support/01-hook-asset.md`
+2. [Phase 2 - `src/init.rs` platform-aware orchestration](windows-support/02-init-platform-awareness.md) - `/home/runner/work/rtk-g/rtk-g/plans/windows-support/02-init-platform-awareness.md`
+3. [Phase 3 - Cross-platform command lookup](windows-support/03-command-lookup.md) - `/home/runner/work/rtk-g/rtk-g/plans/windows-support/03-command-lookup.md`
+4. [Phase 4 - Windows installer](windows-support/04-windows-installer.md) - `/home/runner/work/rtk-g/rtk-g/plans/windows-support/04-windows-installer.md`
+5. [Phase 5 - Documentation updates](windows-support/05-documentation-updates.md) - `/home/runner/work/rtk-g/rtk-g/plans/windows-support/05-documentation-updates.md`
+6. [Phase 6 - Targeted tests](windows-support/06-targeted-tests.md) - `/home/runner/work/rtk-g/rtk-g/plans/windows-support/06-targeted-tests.md`
+7. [Phase 7 - Validation and external contract check](windows-support/07-validation-and-contract.md) - `/home/runner/work/rtk-g/rtk-g/plans/windows-support/07-validation-and-contract.md`
+
+## Planning constraints
+
+- Keep `/home/runner/work/rtk-g/rtk-g/hooks/rtk-rewrite.sh` unchanged for Unix users.
+- Prefer additive Windows assets over broad refactors.
+- Keep rewrite behavior delegated to `rtk rewrite`.
+- Do not make functional product changes until the implementation PR.
+
+## Baseline conclusions retained from the original analysis
+
+- The main Windows blockers remain:
+  - Unix-only Claude hook asset handling
+  - hard-coded `.sh` paths in `/home/runner/work/rtk-g/rtk-g/src/init.rs`
+  - Unix-only `which` lookups in runtime code
+  - missing Windows-native installer flow
+  - docs that still describe Windows as partial/manual support
+- Node + TypeScript was considered for a shared Windows hook path and rejected for the initial implementation because this repository is Rust-only and has no existing Node toolchain or `package.json`.
+- The lowest-disruption path is still:
+  - add a thin Windows-native hook
+  - make `/home/runner/work/rtk-g/rtk-g/src/init.rs` platform-aware
+  - replace Unix-only command lookup
+  - add a Windows installer
+  - update docs and tests
+
+## Expected implementation order
 
 1. Add `hooks/rtk-rewrite.ps1`
-2. Make `/src/init.rs` hook selection/path/detection platform-aware
+2. Make `/home/runner/work/rtk-g/rtk-g/src/init.rs` hook selection/path/detection platform-aware
 3. Replace Unix-only `which` usage in runtime code
 4. Add `install.ps1`
 5. Update README/INSTALL/ARCHITECTURE docs
 6. Add/update targeted tests
-7. Validate:
-   - `cargo fmt --all --check`
-   - `cargo clippy --all-targets`
-   - `cargo test --all`
-   - manual `rtk init -g --show` verification on Windows if available
-
-## Expected scope
-
-### Additions
-
-- `/home/runner/work/rtk-g/rtk-g/hooks/rtk-rewrite.ps1`
-- `/home/runner/work/rtk-g/rtk-g/install.ps1`
-
-### Minimal code changes
-
-- `/home/runner/work/rtk-g/rtk-g/src/init.rs`
-- a small set of runtime lookup call sites or one shared helper plus its callers
-- documentation files listed above
-
-## Open question to resolve before implementation
-
-The only external behavior that should be confirmed before coding is **how Claude Code expects command hooks to be registered on Windows**:
-
-- The `matcher` field in `settings.json` determines which tool/shell context triggers the hook, so it must match whatever Claude Code uses on Windows.
-- Confirm whether the `matcher` remains `"Bash"`.
-- Confirm whether the hook command can be a direct `.ps1` path.
-- Confirm whether it must instead be wrapped via `powershell.exe -File ...`.
-
-**Action item before implementation:** test Claude Code hook registration on Windows and capture the exact accepted matcher/command format, then implement `src/init.rs` and the Windows hook around that confirmed contract.
-
-Everything else can be implemented from the current codebase with small, localized changes.
+7. Run validation and confirm Claude Code’s Windows hook contract
