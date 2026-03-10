@@ -1,6 +1,6 @@
 //! Hook integrity verification via SHA-256.
 //!
-//! RTK installs a PreToolUse hook (`rtk-rewrite.sh`) that auto-approves
+//! RTK installs a PreToolUse hook (`rtk-rewrite.sh` or `rtk-rewrite.ps1`) that auto-approves
 //! rewritten commands with `permissionDecision: "allow"`. Because this
 //! hook bypasses Claude Code's permission prompts, any unauthorized
 //! modification represents a command injection vector.
@@ -19,6 +19,18 @@ use std::path::{Path, PathBuf};
 
 /// Filename for the stored hash (dotfile alongside hook)
 const HASH_FILENAME: &str = ".rtk-hook.sha256";
+
+fn hook_filename() -> &'static str {
+    #[cfg(windows)]
+    {
+        "rtk-rewrite.ps1"
+    }
+
+    #[cfg(not(windows))]
+    {
+        "rtk-rewrite.sh"
+    }
+}
 
 /// Result of hook integrity verification
 #[derive(Debug, PartialEq)]
@@ -56,7 +68,7 @@ fn hash_path(hook_path: &Path) -> PathBuf {
 ///
 /// Format is compatible with `sha256sum -c`:
 /// ```text
-/// <hex_hash>  rtk-rewrite.sh
+/// <hex_hash>  rtk-rewrite.{sh,ps1}
 /// ```
 ///
 /// The hash file is set to read-only (0o444) as a speed bump
@@ -69,7 +81,7 @@ pub fn store_hash(hook_path: &Path) -> Result<()> {
     let filename = hook_path
         .file_name()
         .and_then(|n| n.to_str())
-        .unwrap_or("rtk-rewrite.sh");
+        .unwrap_or(hook_filename());
 
     let content = format!("{}  {}\n", hash, filename);
 
@@ -178,10 +190,10 @@ fn read_stored_hash(path: &Path) -> Result<String> {
     Ok(hash.to_string())
 }
 
-/// Resolve the default hook path (~/.claude/hooks/rtk-rewrite.sh)
+/// Resolve the default hook path (~/.claude/hooks/rtk-rewrite.{sh,ps1})
 pub fn resolve_hook_path() -> Result<PathBuf> {
     dirs::home_dir()
-        .map(|h| h.join(".claude").join("hooks").join("rtk-rewrite.sh"))
+        .map(|h| h.join(".claude").join("hooks").join(hook_filename()))
         .context("Cannot determine home directory. Is $HOME set?")
 }
 
@@ -243,6 +255,7 @@ pub fn run_verify(verbose: u8) -> Result<()> {
 /// No env-var bypass is provided — if the hook is legitimately modified,
 /// re-run `rtk init -g --auto-patch` to re-establish the baseline.
 pub fn runtime_check() -> Result<()> {
+    let hook_path = resolve_hook_path()?;
     match verify_hook()? {
         IntegrityStatus::Verified | IntegrityStatus::NotInstalled => {
             // All good, proceed
@@ -262,7 +275,7 @@ pub fn runtime_check() -> Result<()> {
                 actual.get(..16).unwrap_or(&actual)
             );
             eprintln!();
-            eprintln!("  The hook at ~/.claude/hooks/rtk-rewrite.sh has been modified.");
+            eprintln!("  The hook at {} has been modified.", hook_path.display());
             eprintln!("  This may indicate tampering. RTK will not execute.");
             eprintln!();
             eprintln!("  To restore:  rtk init -g --auto-patch");

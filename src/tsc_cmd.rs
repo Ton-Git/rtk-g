@@ -1,5 +1,5 @@
 use crate::tracking;
-use crate::utils::truncate;
+use crate::utils::{command_exists, truncate};
 use anyhow::{Context, Result};
 use regex::Regex;
 use std::collections::HashMap;
@@ -9,11 +9,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     let timer = tracking::TimedExecution::start();
 
     // Try tsc directly first, fallback to npx if not found
-    let tsc_exists = Command::new("which")
-        .arg("tsc")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
+    let tsc_exists = command_exists("tsc");
 
     let mut cmd = if tsc_exists {
         Command::new("tsc")

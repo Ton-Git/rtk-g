@@ -1,5 +1,5 @@
 use crate::tracking;
-use crate::utils::truncate;
+use crate::utils::{find_command_in_path, truncate};
 use anyhow::{Context, Result};
 use std::process::Command;
 
@@ -85,14 +85,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
 /// Check if a command exists in PATH
 fn which_command(cmd: &str) -> Option<String> {
-    Command::new("which")
-        .arg(cmd)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
+    find_command_in_path(cmd).map(|path| path.display().to_string())
 }
 
 /// Parse pytest output using state machine

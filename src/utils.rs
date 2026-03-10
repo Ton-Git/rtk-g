@@ -7,6 +7,8 @@
 
 use anyhow::{Context, Result};
 use regex::Regex;
+use std::env;
+use std::path::PathBuf;
 use std::process::Command;
 
 /// Truncates a string to `max_len` characters, appending `...` if needed.
@@ -226,14 +228,53 @@ pub fn detect_package_manager() -> &'static str {
     }
 }
 
+fn find_command_in_dirs(cmd: &str, dirs: &[PathBuf], pathext: Option<&str>) -> Option<PathBuf> {
+    for dir in dirs {
+        let direct = dir.join(cmd);
+        if direct.is_file() {
+            return Some(direct);
+        }
+
+        if let Some(exts) = pathext {
+            for ext in exts.split(';').map(str::trim).filter(|ext| !ext.is_empty()) {
+                let ext = ext.trim_start_matches('.');
+                let candidate = dir.join(format!("{cmd}.{ext}"));
+                if candidate.is_file() {
+                    return Some(candidate);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+pub fn find_command_in_path(cmd: &str) -> Option<PathBuf> {
+    let path_var = env::var_os("PATH")?;
+    let dirs: Vec<PathBuf> = env::split_paths(&path_var).collect();
+
+    #[cfg(windows)]
+    {
+        let pathext = env::var("PATHEXT")
+            .unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".to_string())
+            .to_ascii_lowercase();
+        find_command_in_dirs(cmd, &dirs, Some(&pathext))
+    }
+
+    #[cfg(not(windows))]
+    {
+        find_command_in_dirs(cmd, &dirs, None)
+    }
+}
+
+pub fn command_exists(cmd: &str) -> bool {
+    find_command_in_path(cmd).is_some()
+}
+
 /// Build a Command using the detected package manager's exec mechanism.
 /// Returns a Command ready to have tool-specific args appended.
 pub fn package_manager_exec(tool: &str) -> Command {
-    let tool_exists = Command::new("which")
-        .arg(tool)
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
+    let tool_exists = command_exists(tool);
 
     if tool_exists {
         Command::new(tool)
@@ -262,6 +303,8 @@ pub fn package_manager_exec(tool: &str) -> Command {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
+    use tempfile::TempDir;
 
     #[test]
     fn test_truncate_short_string() {
@@ -287,6 +330,30 @@ mod tests {
         assert_eq!(truncate("abc", 3), "abc");
         // When string is longer and max_len is exactly 3, return "..."
         assert_eq!(truncate("hello world", 3), "...");
+    }
+
+    #[test]
+    fn test_find_command_in_dirs_finds_direct_binary() {
+        let temp = TempDir::new().unwrap();
+        let binary = temp.path().join("demo-tool");
+        std::fs::write(&binary, "echo demo").unwrap();
+
+        let found = find_command_in_dirs("demo-tool", &[temp.path().to_path_buf()], None);
+        assert_eq!(found, Some(binary));
+    }
+
+    #[test]
+    fn test_find_command_in_dirs_respects_pathext() {
+        let temp = TempDir::new().unwrap();
+        let binary = temp.path().join("demo-tool.cmd");
+        std::fs::write(&binary, "@echo off").unwrap();
+
+        let found = find_command_in_dirs(
+            "demo-tool",
+            &[PathBuf::from(temp.path())],
+            Some(".com;.exe;.bat;.cmd"),
+        );
+        assert_eq!(found, Some(binary));
     }
 
     #[test]

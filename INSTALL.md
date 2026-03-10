@@ -27,6 +27,13 @@ rtk gain    # Should show token savings stats, NOT "command not found"
 which rtk
 ```
 
+```powershell
+# Windows PowerShell equivalent
+rtk --version
+rtk gain
+Get-Command rtk
+```
+
 If `rtk gain` works, you have the **correct** RTK installed. **DO NOT reinstall**. Skip to "Project Initialization".
 
 If `rtk gain` fails but `rtk --version` succeeds, you have the **wrong** RTK (Type Kit). Uninstall and reinstall the correct one (see below).
@@ -50,6 +57,15 @@ curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh | sh
 After installation, **verify you have the correct rtk**:
 ```bash
 rtk gain  # Must show token savings stats (not "command not found")
+```
+
+### Quick Install (Windows PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/Ton-Git/rtk-g/develop/install.ps1 | iex
+
+# Verify you have the correct rtk
+rtk gain
 ```
 
 ### Alternative: Manual Installation
@@ -93,7 +109,8 @@ rtk gain  # MUST show token savings, not "command not found"
 
 ```bash
 rtk init -g
-# → Installs hook to ~/.claude/hooks/rtk-rewrite.sh
+# → Installs hook to ~/.claude/hooks/rtk-rewrite.sh (macOS/Linux)
+#   or ~/.claude/hooks/rtk-rewrite.ps1 (Windows)
 # → Creates ~/.claude/RTK.md (10 lines, meta commands only)
 # → Adds @RTK.md reference to ~/.claude/CLAUDE.md
 # → Prompts: "Patch settings.json? [y/N]"
@@ -113,7 +130,7 @@ rtk init --show  # Check hook is installed and executable
 Claude Code's hook registry. RTK adds a PreToolUse hook that rewrites commands transparently. Without this, Claude won't invoke the hook automatically.
 
 ```
-  Claude Code          settings.json        rtk-rewrite.sh        RTK binary
+  Claude Code          settings.json      rtk-rewrite.sh/.ps1     RTK binary
        │                    │                     │                    │
        │  "git status"      │                     │                    │
        │ ──────────────────►│                     │                    │
@@ -136,6 +153,27 @@ RTK backs up existing settings.json before changes. Restore if needed:
 ```bash
 cp ~/.claude/settings.json.bak ~/.claude/settings.json
 ```
+
+```powershell
+Copy-Item $HOME\.claude\settings.json.bak $HOME\.claude\settings.json
+```
+
+### Windows Setup
+
+**Best for: Native PowerShell workflow on Windows**
+
+```powershell
+# Install binary
+irm https://raw.githubusercontent.com/Ton-Git/rtk-g/develop/install.ps1 | iex
+
+# Install hook + RTK.md + settings registration prompt
+rtk init -g
+
+# Verify setup
+rtk init --show
+```
+
+Windows installs the PowerShell hook at `~/.claude/hooks/rtk-rewrite.ps1` and registers it in `settings.json` using a `powershell.exe -NoProfile -ExecutionPolicy Bypass -File ...` command wrapper.
 
 ### Alternative: Local Project Setup
 
@@ -247,7 +285,7 @@ rtk vitest run
 rtk init -g --uninstall
 
 # What gets removed:
-#   - Hook: ~/.claude/hooks/rtk-rewrite.sh
+#   - Hook: ~/.claude/hooks/rtk-rewrite.sh or ~/.claude/hooks/rtk-rewrite.ps1
 #   - Context: ~/.claude/RTK.md
 #   - Reference: @RTK.md line from ~/.claude/CLAUDE.md
 #   - Registration: RTK hook entry from settings.json
